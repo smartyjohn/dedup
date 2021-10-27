@@ -11,16 +11,27 @@ import (
 )
 
 var (
-	ErrSyntax = errors.New("")
+	ErrSyntax = errors.New("\nDe-duplicates lines from input, writing to standard out.  If an argument is given, input is read from that path; otherwise data is read from stdin.")
 )
 
+//goland:noinspection GoUnhandledErrorResult
 func main() {
 	r, w := setup()
 	defer r.Close()
 	defer w.Close()
 
+	exec(r, w)
+}
+
+func exec(r io.Reader, w io.Writer) {
 	idx := make(map[uint64]struct{}, 100_000)
 	hash64 := fnv.New64()
+	eol := []byte("\n") //TODO, use same as input
+
+	out := bufio.NewWriter(w)
+	defer func(out *bufio.Writer) {
+		fatal(out.Flush(), "write error:")
+	}(out)
 
 	scan := bufio.NewScanner(r)
 	for scan.Scan() {
@@ -28,12 +39,12 @@ func main() {
 		key := hasher(line, hash64)
 		if _, exists := idx[key]; !exists {
 			idx[key] = struct{}{}
-			_, err := w.Write(line)
-			fatal(err, "write error:")
+			fatalWrite(out.Write(line))
+			fatalWrite(out.Write(eol))
 		}
 	}
 
-	fatal(scan.Err(), "read error")
+	fatal(scan.Err(), "read error:")
 }
 
 func fatal(err error, prefix string) {
@@ -43,14 +54,18 @@ func fatal(err error, prefix string) {
 	}
 }
 
+func fatalWrite(n int, err error) {
+	fatal(err, "write error:")
+}
+
 func hasher(b []byte, hash hash.Hash64) uint64 {
 	hash.Reset()
 	_, err := hash.Write(b)
-	fatal(err, "hasher:")
+	fatal(err, "hasher error:")
 	return hash.Sum64()
 }
 
-func setup() (r *os.File, w io.WriteCloser) {
+func setup() (r io.ReadCloser, w io.WriteCloser) {
 	w = os.Stdout
 	switch len(os.Args) {
 	case 1: //stdin
@@ -58,7 +73,7 @@ func setup() (r *os.File, w io.WriteCloser) {
 	case 2: //file
 		path := os.Args[1]
 		fh, err := os.Open(path)
-		fatal(err, "read error:")
+		fatal(err, "input file error:")
 		r = fh
 	default:
 		fatal(ErrSyntax, "bad syntax:")
