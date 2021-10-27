@@ -34,6 +34,7 @@ func exec(r io.Reader, w io.Writer) {
 	}(out)
 
 	scan := bufio.NewScanner(r)
+	dupes := 0
 	for scan.Scan() {
 		line := scan.Bytes()
 		key := hasher(line, hash64)
@@ -41,10 +42,13 @@ func exec(r io.Reader, w io.Writer) {
 			idx[key] = struct{}{}
 			fatalWrite(out.Write(line))
 			fatalWrite(out.Write(eol))
+		} else {
+			dupes++
 		}
 	}
 
 	fatal(scan.Err(), "read error:")
+	fatalWrite(fmt.Fprintln(os.Stderr, "Duplicates removed:", dupes))
 }
 
 func fatal(err error, prefix string) {
