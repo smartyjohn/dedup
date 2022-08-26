@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrSyntax = errors.New("\nDe-duplicates lines from input, writing to standard out.  If an argument is given, input is read from that path; otherwise data is read from stdin.")
+	ErrSyntax = errors.New("\nDe-duplicates lines from input, writing to standard out.  An argument of '-i' reads from stdin, otherwise the argument is read as a file.")
 )
 
 //goland:noinspection GoUnhandledErrorResult
@@ -71,16 +71,17 @@ func hasher(b []byte, hash hash.Hash64) uint64 {
 
 func setup() (r io.ReadCloser, w io.WriteCloser) {
 	w = os.Stdout
-	switch len(os.Args) {
-	case 1: //stdin
+	if len(os.Args) <= 1 {
+		fatal(ErrSyntax, "bad syntax:")
+	}
+	switch os.Args[1] {
+	case "-i": //stdin
 		r = os.Stdin
-	case 2: //file
+	default: //file
 		path := os.Args[1]
 		fh, err := os.Open(path)
 		fatal(err, "input file error:")
 		r = fh
-	default:
-		fatal(ErrSyntax, "bad syntax:")
 	}
 
 	return
